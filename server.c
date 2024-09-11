@@ -189,6 +189,14 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
         player_progress[i] = (int*)calloc(word_len, sizeof(int));  // Initialize all progress arrays to 0s (not guessed)
     }
 
+    for (int i = 0; i < playercount; i++) {
+        for(int j= 0 ; j < word_len ; j++)
+        {
+        player_progress[i][j] = 0; // Initialize all progress arrays to 0s (not guessed)
+        }
+    
+    }
+
     // Step 2: Send word length to each client
     for (int i = 0; i < playercount; i++) {
         if (client_sockets[i] != 0) {
@@ -208,22 +216,39 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
                 game_active = 1;  // At least one player is still guessing
 
                 char guess;
+                char *boolean_array = malloc(word_len * sizeof(char)); // Boolean array for client i
+                for(int i=0; i<=word_len ; i++)
+                {
+                    boolean_array[i] = '0';
+                }
+                boolean_array[word_len] = '\0';
+               
                 if (recv(client_sockets[i], &guess, sizeof(guess), 0) > 0) {
+                   
                     // Step 4: Check if guessed char is in the word
                     int updated = 0;  // Tracks whether the word has been updated with new found letters
-
-                    int boolean_array[word_len];  // Boolean array for client i
 
                     for (int j = 0; j < word_len; j++) {
                         if (word[j] == guess && player_progress[i][j] == 0) {
                             player_progress[i][j] = 1;  // Mark the letter as found
                             updated = 1;
                         }
-                        boolean_array[j] = player_progress[i][j];  // Copy current progress to the boolean array
+                        int progress_value = player_progress[i][j];  // Get the int value from player_progress
+                        // Convert the int (0 or 1) to the corresponding char ('0' or '1')
+                        char tt = progress_value ? '1' : '0'; 
+                        boolean_array[j] =  tt; // Copy current progress to the boolean array
                     }
-
+                      ssize_t ss= send(client_sockets[i], boolean_array, strlen(boolean_array), 0);
                     // Step 5: Send boolean array to client
-                    send(client_sockets[i], boolean_array, sizeof(boolean_array), 0);
+                     if(ss <=0)
+                     {
+                        perror("Send error: ");
+
+                     }
+                     else
+                     {
+                        printf("bytes send: %zd" , ss);
+                     }
 
                     // Step 6: Check if the client has won
                     if (!updated) {
@@ -246,6 +271,11 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
                     if (guesses_left[i] <= 0) {
                         printf("Player %d has used up all their guesses!\n", i + 1);
                     }
+                }
+                else
+                {
+                    perror("Failed: ");
+                    exit(EXIT_FAILURE);
                 }
             }
         }
