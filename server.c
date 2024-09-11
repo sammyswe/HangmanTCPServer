@@ -178,7 +178,7 @@ char* getPlayerName(int sd, char** player_name) {
 
 // Function to play a round of the game
 void playRound(int playercount, int client_sockets[], char* player_names[], int player_scores[]) {
-    char* word = "abcdef";//randomWord();  // Generate the word for the round
+    char* word = randomWord();  // Generate the word for the round
     int word_len = strlen(word);
     
     // Array to track progress for each client
