@@ -76,23 +76,12 @@ int main(void) {
     }
 
     printf("All players have joined. Starting game...\n");
-
-    // Play multiple rounds
-    for (int round = 0; round < NUM_ROUNDS; round++) {
-        printf("Starting round %d...\n", round + 1);
-        playRound(playercount, client_sockets, player_names, player_scores);
-    }
-
-    // End of game
-    printf("Game over! Final scores:\n");
-    for (int i = 0; i < playercount; i++) {
-        printf("Player %d (%s): %d points\n", i + 1, player_names[i], player_scores[i]);
-    }
+    playRound(playercount, client_sockets, player_names, player_scores);
 
     return 0;
 }
 
-// Setup server socket
+// Setup server socket,
 int setupServer(int playercount) {
     int server_fd;
     struct sockaddr_in address;
@@ -291,6 +280,7 @@ void sendLeaderboard(int playercount, int client_sockets[], char* player_names[]
     }
 }
 
+//generate random word from list
 char * randomWord(){
     
     char* selectedWord;
