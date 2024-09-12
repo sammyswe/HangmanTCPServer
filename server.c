@@ -180,7 +180,7 @@ char* getPlayerName(int sd, char** player_name) {
 void playRound(int playercount, int client_sockets[], char* player_names[], int player_scores[]) {
     char* word = randomWord();  // Generate the word for the round
     int word_len = strlen(word);
-    
+    printf("word Choosen : %s \n" , word);
     // Array to track progress for each client
     int guesses_left[playercount];
     int* player_progress[playercount]; // Each client will have their own boolean array to track progress
@@ -271,6 +271,21 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
 
                     if (guesses_left[i] <= 0) {
                         printf("Player %d has used up all their guesses!\n", i + 1);
+                    }
+                    int all_guessd = 1;
+                    for(int j = 0; j < word_len ;j++)
+                    {
+                        if(player_progress[i][j] == 0)
+                        {
+                            all_guessd = 0;
+                            break;
+                        }
+                    }   
+                    if(all_guessd == 1)
+                    {
+                        // break and send leaderboard
+                         sendLeaderboard(playercount, client_sockets, player_names, player_scores);
+
                     }
                 }
                 else
