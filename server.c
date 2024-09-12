@@ -180,82 +180,61 @@ char* getPlayerName(int sd, char** player_name) {
 void playRound(int playercount, int client_sockets[], char* player_names[], int player_scores[]) {
     char* word = randomWord();  // Generate the word for the round
     int word_len = strlen(word);
-    printf("word Choosen : %s \n" , word);
-    // Array to track progress for each client
+    printf("word Choosen: %s \n", word);
+
     int guesses_left[playercount];
-    int* player_progress[playercount]; // Each client will have their own boolean array to track progress
+    int* player_progress[playercount];  // Track progress for each client
 
     for (int i = 0; i < playercount; i++) {
         player_progress[i] = (int*)calloc(word_len, sizeof(int));  // Initialize all progress arrays to 0s (not guessed)
-    }
-
-    for (int i = 0; i < playercount; i++) {
-        for(int j= 0 ; j < word_len ; j++)
-        {
-        player_progress[i][j] = 0; // Initialize all progress arrays to 0s (not guessed)
-        }
-    
+        guesses_left[i] = MAX_GUESSES;  // Initialize guesses for each player
     }
 
     // Step 2: Send word length to each client
     for (int i = 0; i < playercount; i++) {
         if (client_sockets[i] != 0) {
             send(client_sockets[i], &word_len, sizeof(word_len), 0);
-            guesses_left[i] = MAX_GUESSES;  // Initialize guesses for each player
         }
     }
-    
-    int game_active = 1;
 
-    while (game_active) {
-        game_active = 0;  // Assume no active players, will update in the loop
+    int all_players_done = 0;
 
-        // Step 3: Process guesses from each client
+    // Main game loop until all players finish
+    while (!all_players_done) {
+        all_players_done = 1;  // Assume all players are done, then check for active players
+
         for (int i = 0; i < playercount; i++) {
             if (client_sockets[i] != 0 && guesses_left[i] > 0) {
-                game_active = 1;  // At least one player is still guessing
+                all_players_done = 0;  // At least one player is still active
 
                 char guess;
-                char *boolean_array = malloc(word_len * sizeof(char)); // Boolean array for client i
-                for(int i=0; i<=word_len ; i++)
-                {
-                    boolean_array[i] = '0';
-                }
-                boolean_array[word_len] = '\0';
-               
-                if (recv(client_sockets[i], &guess, sizeof(guess), 0) > 0) {
-                   
-                    // Step 4: Check if guessed char is in the word
-                    int updated = 0;  // Tracks whether the word has been updated with new found letters
+                char boolean_array[word_len];  // Boolean array for client i
+                memset(boolean_array, '0', word_len);  // Initialize all to '0'
 
+                // Receive player's guess
+                if (recv(client_sockets[i], &guess, sizeof(guess), 0) > 0) {
+                    int updated = 0;
+
+                    // Check if guessed char is in the word
                     for (int j = 0; j < word_len; j++) {
                         if (word[j] == guess && player_progress[i][j] == 0) {
                             player_progress[i][j] = 1;  // Mark the letter as found
                             updated = 1;
                         }
-                        int progress_value = player_progress[i][j];  // Get the int value from player_progress
-                        // Convert the int (0 or 1) to the corresponding char ('0' or '1')
-                        char tt = progress_value ? '1' : '0'; 
-                        boolean_array[j] =  tt; // Copy current progress to the boolean array
+
+                        // Update boolean array
+                        boolean_array[j] = player_progress[i][j] ? '1' : '0';
                     }
-                      ssize_t ss= send(client_sockets[i], boolean_array, strlen(boolean_array), 0);
-                    // Step 5: Send boolean array to client
-                     if(ss <=0)
-                     {
-                        perror("Send error: ");
 
-                     }
-                     else
-                     {
-                        printf("bytes send: %zd" , ss);
-                     }
+                    // Send boolean array to client
+                    send(client_sockets[i], boolean_array, word_len, 0);
 
-                    // Step 6: Check if the client has won
+                    // Deduct a guess if the letter wasn't found
                     if (!updated) {
-                        guesses_left[i]--;  // Deduct a guess for a wrong letter
+                        guesses_left[i]--;
                     }
 
-                    // check guess
+                    // Check if the player has guessed the whole word
                     int solved = 1;
                     for (int j = 0; j < word_len; j++) {
                         if (player_progress[i][j] == 0) {
@@ -264,47 +243,35 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
                         }
                     }
 
+                    // Update score if the player has solved the word
                     if (solved) {
                         int score = word_len * 10;  // Example scoring system
                         player_scores[i] += score;
-                    }
-
-                    if (guesses_left[i] <= 0) {
-                        printf("Player %d has used up all their guesses!\n", i + 1);
-                    }
-                    int all_guessd = 1;
-                    for(int j = 0; j < word_len ;j++)
-                    {
-                        if(player_progress[i][j] == 0)
-                        {
-                            all_guessd = 0;
-                            break;
-                        }
-                    }   
-                    if(all_guessd == 1)
-                    {
-                        // break and send leaderboard
-                         sendLeaderboard(playercount, client_sockets, player_names, player_scores);
-
+                        guesses_left[i] = 0;  // Player is finished
                     }
                 }
-                else
-                {
-                    perror("Failed: ");
-                    exit(EXIT_FAILURE);
-                }
+            }
+        }
+
+        // Check if all players have either guessed the word or run out of guesses
+        all_players_done = 1;
+        for (int i = 0; i < playercount; i++) {
+            if (guesses_left[i] > 0) {
+                all_players_done = 0;
+                break;
             }
         }
     }
 
-    // Step 7: Send the leaderboard
+    // Step 7: After all players have finished, send the leaderboard
     sendLeaderboard(playercount, client_sockets, player_names, player_scores);
 
-    // Free allocated memory for player progress arrays
+    // Free allocated memory
     for (int i = 0; i < playercount; i++) {
         free(player_progress[i]);
     }
 }
+
 
 // Send the leaderboard to all players
 void sendLeaderboard(int playercount, int client_sockets[], char* player_names[], int player_scores[]) {
@@ -318,10 +285,16 @@ void sendLeaderboard(int playercount, int client_sockets[], char* player_names[]
         strcat(leaderboard, entry);
     }
 
-    // Send the leaderboard to each client
+    // Get the size of the leaderboard
+    unsigned char sizeLeaderboard = (unsigned char)strlen(leaderboard);
+
+    // Send the size and the actual leaderboard to each client
     for (int i = 0; i < playercount; i++) {
         if (client_sockets[i] != 0) {
-            send(client_sockets[i], leaderboard, strlen(leaderboard), 0);
+            // Send the size of the leaderboard first (1 byte)
+            send(client_sockets[i], &sizeLeaderboard, sizeof(sizeLeaderboard), 0);
+            // Send the actual leaderboard string
+            send(client_sockets[i], leaderboard, sizeLeaderboard, 0);
         }
     }
 }
