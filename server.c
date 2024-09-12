@@ -255,6 +255,7 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
                         guesses_left[i]--;  // Deduct a guess for a wrong letter
                     }
 
+                    // check guess
                     int solved = 1;
                     for (int j = 0; j < word_len; j++) {
                         if (player_progress[i][j] == 0) {
