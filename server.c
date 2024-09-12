@@ -245,7 +245,7 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
 
                     // Update score if the player has solved the word
                     if (solved) {
-                        int score = word_len * 10;  // Example scoring system
+                        int score = (word_len+ guesses_left[i]);  // Example scoring system
                         player_scores[i] += score;
                         guesses_left[i] = 0;  // Player is finished
                     }
@@ -274,14 +274,48 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
 
 
 // Send the leaderboard to all players
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
 void sendLeaderboard(int playercount, int client_sockets[], char* player_names[], int player_scores[]) {
     char leaderboard[1024] = "";  // Large buffer to hold leaderboard data
 
-    // Construct the leaderboard string
-    strcat(leaderboard, "Leaderboard:\n");
+    // Temporary arrays to store sorted data
+    int sorted_scores[playercount];
+    char* sorted_names[playercount];
+
+    // Copy the original scores and names to the sorted arrays
+    for (int i = 0; i < playercount; i++) {
+        sorted_scores[i] = player_scores[i];
+        sorted_names[i] = player_names[i];
+    }
+
+    // Sort the players by scores in descending order (bubble sort for simplicity)
+    for (int i = 0; i < playercount - 1; i++) {
+        for (int j = 0; j < playercount - i - 1; j++) {
+            if (sorted_scores[j] < sorted_scores[j + 1]) {
+                // Swap scores
+                int temp_score = sorted_scores[j];
+                sorted_scores[j] = sorted_scores[j + 1];
+                sorted_scores[j + 1] = temp_score;
+
+                // Swap corresponding names
+                char* temp_name = sorted_names[j];
+                sorted_names[j] = sorted_names[j + 1];
+                sorted_names[j + 1] = temp_name;
+            }
+        }
+    }
+
+    // Construct the sorted leaderboard string
     for (int i = 0; i < playercount; i++) {
         char entry[128];
-        sprintf(entry, "Player %d (%s): %d points\n", i + 1, player_names[i], player_scores[i]);
+        if (i == 0) {
+            sprintf(entry, "1st: %s - %d points\n", sorted_names[i], sorted_scores[i]);
+        } else {
+            sprintf(entry, "%dth: %s - %d points\n", i + 1, sorted_names[i], sorted_scores[i]);
+        }
         strcat(leaderboard, entry);
     }
 
@@ -298,6 +332,7 @@ void sendLeaderboard(int playercount, int client_sockets[], char* player_names[]
         }
     }
 }
+
 
 //generate random word from list
 char * randomWord(){
