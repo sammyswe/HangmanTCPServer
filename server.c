@@ -10,7 +10,7 @@
 #define MAX_GUESSES 8
 #define NUM_ROUNDS 5
 
-// Function prototypes
+
 int setupServer(int playercount);
 void acceptNewConnection(int server_fd, int client_sockets[], int playercount, struct sockaddr_in* address, int addrlen);
 void retrieveClientNickname(int playercount, int client_sockets[], fd_set* readfds, char* player_names[]);
