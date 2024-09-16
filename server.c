@@ -8,7 +8,7 @@
 #define NUM_WORDS 480
 #define PORT 8080
 #define MAX_GUESSES 8
-#define NUM_ROUNDS 5
+
 
 int setupServer(int playercount);
 void acceptNewConnection(int server_fd, int client_sockets[], int playercount, struct sockaddr_in* address, int addrlen);
@@ -20,8 +20,13 @@ void sendLeaderboard(int playercount, int client_sockets[], char* player_names[]
 
 int main(void) {
     int playercount;
+    int numRounds;  
     printf("Insert player count: ");
     scanf("%d", &playercount);
+    printf("Insert number of rounds: ");
+    scanf("%d", &numRounds);
+
+
 
     int client_sockets[playercount];
     char* player_names[playercount];
@@ -77,7 +82,7 @@ int main(void) {
 
     printf("All players have joined. Starting game...\n");
 
-    for (int round = 0; round < NUM_ROUNDS; round++) {
+    for (int round = 0; round < numRounds; round++) {
         printf("Starting Round %d...\n", round + 1);
         playRound(playercount, client_sockets, player_names, player_scores);
 
@@ -208,17 +213,22 @@ char* getPlayerName(int sd, char** player_name) {
 
 // Function to play a round of the game
 void playRound(int playercount, int client_sockets[], char* player_names[], int player_scores[]) {
+
     char* word = randomWord();  // Generate the word for the round
     int word_len = strlen(word);
     printf("Word chosen: %s \n", word);
 
-    int guesses_left[playercount];
+    int guesses_left[playercount];  // This will store remaining guesses (lives) for each player
     int* player_progress[playercount];  // Track progress for each client
 
+    // Initialize progress and guesses_left arrays at the start of each round
     for (int i = 0; i < playercount; i++) {
         player_progress[i] = (int*)calloc(word_len, sizeof(int));  // Initialize all progress arrays to 0s (not guessed)
-        guesses_left[i] = MAX_GUESSES;  // Initialize guesses for each player
+        guesses_left[i] = MAX_GUESSES;  // Reset lives (guesses) for each player
     }
+
+
+
 
     // Send word length to each client
     for (int i = 0; i < playercount; i++) {
