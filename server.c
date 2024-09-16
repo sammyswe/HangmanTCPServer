@@ -210,9 +210,30 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
                 char guess;
                 char boolean_array[word_len];  // Boolean array for client i
                 memset(boolean_array, '0', word_len);  // Initialize all to '0'
-
+                ///
                 // Receive player's guess
-                if (recv(client_sockets[i], &guess, sizeof(guess), 0) > 0) {
+                int bytes_received = recv(client_sockets[i], &guess, sizeof(guess), 0);
+
+                // Check if the client disconnected or there was an error
+                if (bytes_received == 0) {
+                    // Client disconnected gracefully
+                    printf("Client %d disconnected.\n", i);
+                    close(client_sockets[i]);  // Close the socket
+                    client_sockets[i] = 0;     // Set socket to 0 to indicate it's no longer in use
+                    //-- ; // decrement total number of players
+                    free(player_progress[i]); // free allocated memory for that player
+                    player_progress[i] = NULL; // point the free mem to NULL
+                } else if (bytes_received < 0) {
+                    // An error occurred (you can handle specific errors here if needed)
+                    perror("recv error");
+                    close(client_sockets[i]);  // Close the socket
+                    client_sockets[i] = 0;     // Set socket to 0 to indicate it's no longer in use
+                    //playercount-- ; // decrement total number of players
+                    free(player_progress[i]); // free allocated memory for that player
+                    player_progress[i] = NULL; // point the free mem to NULL
+                }
+                else // Receive player's guess  
+                {
                     int updated = 0;
 
                     // Check if guessed char is in the word
@@ -256,7 +277,7 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
         // Check if all players have either guessed the word or run out of guesses
         all_players_done = 1;
         for (int i = 0; i < playercount; i++) {
-            if (guesses_left[i] > 0) {
+            if (guesses_left[i] > 0 && player_progress[i] != NULL) {
                 all_players_done = 0;
                 break;
             }
@@ -318,7 +339,6 @@ void sendLeaderboard(int playercount, int client_sockets[], char* player_names[]
         }
         strcat(leaderboard, entry);
     }
-
     // Get the size of the leaderboard
     unsigned char sizeLeaderboard = (unsigned char)strlen(leaderboard);
 
