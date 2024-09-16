@@ -294,10 +294,6 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
 }
 
 
-// Send the leaderboard to all players
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 
 void sendLeaderboard(int playercount, int client_sockets[], char* player_names[], int player_scores[]) {
     char leaderboard[1024] = "";  // Large buffer to hold leaderboard data
