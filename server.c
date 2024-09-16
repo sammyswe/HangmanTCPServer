@@ -10,7 +10,6 @@
 #define MAX_GUESSES 8
 #define NUM_ROUNDS 5
 
-
 int setupServer(int playercount);
 void acceptNewConnection(int server_fd, int client_sockets[], int playercount, struct sockaddr_in* address, int addrlen);
 void retrieveClientNickname(int playercount, int client_sockets[], fd_set* readfds, char* player_names[]);
@@ -27,7 +26,7 @@ int main(void) {
     int client_sockets[playercount];
     char* player_names[playercount];
     int player_scores[playercount];  
-    memset(player_scores, 0, sizeof(player_scores));  
+    memset(player_scores, 0, sizeof(player_scores));  // Scores persist across rounds
     memset(client_sockets, 0, sizeof(client_sockets));  
     memset(player_names, 0, sizeof(player_names)); 
 
@@ -39,7 +38,8 @@ int main(void) {
     printf("Hangman Lobby Open. Waiting for Players to Join...\n");
     int connected_players = 0;
     fd_set readfds;
-    
+
+    // Waiting for all players to join
     while (connected_players < playercount) {
         FD_ZERO(&readfds);  // Clear the set
         FD_SET(server_fd, &readfds);  // Add the server socket to the set
@@ -76,7 +76,37 @@ int main(void) {
     }
 
     printf("All players have joined. Starting game...\n");
-    playRound(playercount, client_sockets, player_names, player_scores);
+
+    for (int round = 0; round < NUM_ROUNDS; round++) {
+        printf("Starting Round %d...\n", round + 1);
+        playRound(playercount, client_sockets, player_names, player_scores);
+
+        // Wait for clients to "ready up" for the next round
+        printf("Waiting for players to ready up for the next round...\n");
+        for (int i = 0; i < playercount; i++) {
+            char ready;
+            if (client_sockets[i] != 0) {
+                int res = recv(client_sockets[i], &ready, sizeof(ready), 0);
+                if (res == -1 || ready != 'R') {
+                    printf("Player %s failed to ready up.\n", player_names[i]);
+                    close(client_sockets[i]);
+                    client_sockets[i] = 0;
+                } else {
+                    printf("Player %s is ready for the next round.\n", player_names[i]);
+                }
+            }
+        }
+
+        printf("All players ready. Starting the next round...\n");
+    }
+
+    printf("Game over. Sending final leaderboard...\n");
+    sendLeaderboard(playercount, client_sockets, player_names, player_scores);
+
+    // Close all sockets at the end of the game
+    for (int i = 0; i < playercount; i++) {
+        close(client_sockets[i]);
+    }
 
     return 0;
 }
@@ -180,7 +210,7 @@ char* getPlayerName(int sd, char** player_name) {
 void playRound(int playercount, int client_sockets[], char* player_names[], int player_scores[]) {
     char* word = randomWord();  // Generate the word for the round
     int word_len = strlen(word);
-    printf("word Choosen: %s \n", word);
+    printf("Word chosen: %s \n", word);
 
     int guesses_left[playercount];
     int* player_progress[playercount];  // Track progress for each client
@@ -190,7 +220,7 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
         guesses_left[i] = MAX_GUESSES;  // Initialize guesses for each player
     }
 
-    // Step 2: Send word length to each client
+    // Send word length to each client
     for (int i = 0; i < playercount; i++) {
         if (client_sockets[i] != 0) {
             send(client_sockets[i], &word_len, sizeof(word_len), 0);
@@ -210,7 +240,7 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
                 char guess;
                 char boolean_array[word_len];  // Boolean array for client i
                 memset(boolean_array, '0', word_len);  // Initialize all to '0'
-                ///
+                
                 // Receive player's guess
                 int bytes_received = recv(client_sockets[i], &guess, sizeof(guess), 0);
 
@@ -220,17 +250,15 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
                     printf("Client %d disconnected.\n", i);
                     close(client_sockets[i]);  // Close the socket
                     client_sockets[i] = 0;     // Set socket to 0 to indicate it's no longer in use
-                    //-- ; // decrement total number of players
-                    free(player_progress[i]); // free allocated memory for that player
-                    player_progress[i] = NULL; // point the free mem to NULL
+                    free(player_progress[i]); // Free allocated memory for that player
+                    player_progress[i] = NULL; // Point the freed memory to NULL
                 } else if (bytes_received < 0) {
                     // An error occurred (you can handle specific errors here if needed)
                     perror("recv error");
                     close(client_sockets[i]);  // Close the socket
                     client_sockets[i] = 0;     // Set socket to 0 to indicate it's no longer in use
-                    //playercount-- ; // decrement total number of players
-                    free(player_progress[i]); // free allocated memory for that player
-                    player_progress[i] = NULL; // point the free mem to NULL
+                    free(player_progress[i]); // Free allocated memory for that player
+                    player_progress[i] = NULL; // Point the freed memory to NULL
                 }
                 else // Receive player's guess  
                 {
@@ -266,7 +294,7 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
 
                     // Update score if the player has solved the word
                     if (solved) {
-                        int score = (word_len+ guesses_left[i]);  // Example scoring system
+                        int score = (word_len + guesses_left[i]);  // Example scoring system
                         player_scores[i] += score;
                         guesses_left[i] = 0;  // Player is finished
                     }
@@ -284,7 +312,7 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
         }
     }
 
-    // Step 7: After all players have finished, send the leaderboard
+    // After all players have finished, send the leaderboard
     sendLeaderboard(playercount, client_sockets, player_names, player_scores);
 
     // Free allocated memory
@@ -293,8 +321,7 @@ void playRound(int playercount, int client_sockets[], char* player_names[], int 
     }
 }
 
-
-
+// Send leaderboard to all players
 void sendLeaderboard(int playercount, int client_sockets[], char* player_names[], int player_scores[]) {
     char leaderboard[1024] = "";  // Large buffer to hold leaderboard data
 
@@ -335,6 +362,7 @@ void sendLeaderboard(int playercount, int client_sockets[], char* player_names[]
         }
         strcat(leaderboard, entry);
     }
+
     // Get the size of the leaderboard
     unsigned char sizeLeaderboard = (unsigned char)strlen(leaderboard);
 
@@ -348,6 +376,7 @@ void sendLeaderboard(int playercount, int client_sockets[], char* player_names[]
         }
     }
 }
+
 
 
 //generate random word from list
